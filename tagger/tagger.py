@@ -45,7 +45,7 @@ class Tagger(abc.ABC):
         '''find tags in path
         Args:
             path(str): dir path to recursively search for tags; or file path to search only for that file.
-            *tags(str): tags to search
+            *tags(str): tags to search. at least one tag is given
             **kwargs:
                 top_only(boolean): only top directories or files will be returned
         Return(list(str)): abs paths that hold tags. if path doesn't exist reuturn empty list
@@ -59,9 +59,9 @@ class Tagger(abc.ABC):
             else:
                 return []
         if kwargs.get("top_only"):
-            return self.__find_tags_top_only(path, *tags)
+            return self._find_tags_top_only(path, *tags, **kwargs)
         else:
-            return self.__find_tags_all(path, *tags)
+            return self._find_tags_all(path, *tags, **kwargs)
 
     def get_tags(self, path, **kwargs):
         '''get tags in path
@@ -116,10 +116,10 @@ class Tagger(abc.ABC):
                 os.mkdir(dest_path)
             except:
                 return False
-        paths = self.find_tags(path, *tags, top_only=True)
+        paths = self.find_tags(path, *tags, top_only=True, **kwargs)
         for p in paths:
             target = os.path.join(dest_path, os.path.basename(p))
-            target = self.__handle_dup_path(p, target)
+            target = self._handle_dup_path(p, target)
             try:
                 if os.path.isdir(p):
                     shutil.copytree(p, target)
@@ -140,40 +140,92 @@ class Tagger(abc.ABC):
         '''write tags of path. path must exist.'''
         pass
 
-    def __find_tags_top_only(self, path, *tags):
-        '''path must exist'''
-        # use BFS
-        roots = deque([path])
-        paths = []
+    def _possible_tagged_paths(self, root, depth=None):
+        '''get abs paths that possible have tag under root(including root). root must be existent directory.
+        The yield paths' order is top folder => common files in top folder => recursively to sub folders and its files
+        Args:
+            root: root path
+            depth: depth of path to find
+        Return(corouting): every time return a possible path, formatted as tuple(path, is_dir) then receive 
+            a boolean value specific whether to continue under that path.
+        '''
+        curr_depth = 0
+        roots = deque([root])
+        tmp_roots = deque()
+        sub_roots = deque()
         while len(roots):
-            _path = roots.pop()
-            root, dirs, files = next(os.walk(_path))
-            if self.__contain_tags(root, *tags):
-                paths.append(os.path.abspath(root))
-            for f in map(lambda f: os.path.join(root, f), files):
-                if self.__contain_tags(f, *tags):
-                    paths.append(os.path.abspath(f))
-            for d in map(lambda d: os.path.join(root, d), dirs):
-                if self.__contain_tags(d, *tags):
-                    paths.append(os.path.abspath(d))
+            while len(roots):
+                top = roots.pop()
+                if self._possible_has_tag_entry(top):
+                    stop = yield top, True
+                    if not stop:
+                        tmp_roots.appendleft(top)
                 else:
-                    roots.append(d)
-        return paths
+                    # only search sub dirs
+                    scandir_it = os.scandir(top)
+                    sub_roots.extendleft(map(lambda entry: entry.path, filter(
+                        lambda entry: entry.is_dir(), scandir_it)))
+            if curr_depth == depth:
+                break
+            roots = sub_roots
+            while len(tmp_roots):
+                top = tmp_roots.pop()
+                scandir_it = os.scandir(top)
+                for entry in scandir_it:
+                    if entry.is_dir():
+                        roots.appendleft(entry.path)
+                    else:
+                        _ = yield entry.path, False
+            curr_depth += 1
 
-    def __find_tags_all(self, path, *tags):
+    def _possible_has_tag_entry(self, directory, recursive=False):
+        '''whether directory or file under directory possible has tag. this is for speed improvement
+        directory must exist
+        '''
+        return True
+
+    def _find_tags_top_only(self, path, *tags, **kwargs):
+        '''path must exist'''
         paths = []
-        for root, _, files in os.walk(path):
-            target_paths = [os.path.join(root, f) for f in files]
-            target_paths.append(root)
-            for target in target_paths:
-                if self.__contain_tags(target, *tags):
-                    paths.append(os.path.abspath(target))
+        path_gen = self._possible_tagged_paths(path, depth=kwargs.get('depth'))
+        ret = path_gen.send(None)
+        try:
+            while True:
+                p, is_dir = ret
+                if self._contain_tags(p, *tags):
+                    paths.append(os.path.abspath(p))
+                    if is_dir:
+                        ret = path_gen.send(True)
+                        continue
+                ret = path_gen.send(False)
+        except StopIteration:
+            pass
         return paths
 
-    def __contain_tags(self, path, *tags):
+    def _find_tags_all(self, path, *tags, **kwargs):
+        paths = []
+        path_gen = self._possible_tagged_paths(path, depth=kwargs.get('depth'))
+        ret = path_gen.send(None)
+        try:
+            while True:
+                p, _ = ret
+                if self._contain_tags(p, *tags):
+                    paths.append(os.path.abspath(p))
+                ret = path_gen.send(False)
+        except StopIteration:
+            pass
+        return paths
+
+    def _contain_tags(self, path, *tags):
         return set(tags).issubset(set(self.get_tags(path)))
 
-    def __handle_dup_path(self, path, target):
+    def _handle_dup_path(self, path, target):
+        '''handle dup path when merging
+        Args:
+            path(str): origin path of file
+            target(str): target path that might be duplicated
+        Return(str): name not duplicated.
+        '''
         if os.path.exists(target):
             postfix = 1
             while os.path.exists("{}_{}".format(target, postfix)):
@@ -217,6 +269,9 @@ class FileTagger(Tagger):
             meta[_path] = list(set(tags))
         return self.__write_tag_meta(path, meta)
 
+    def _possible_has_tag_entry(self, directory, recursive=False):
+        return os.path.exists(self.__get_tag_file(os.path.abspath(directory)))
+
     def __read_tag_meta(self, path):
         tag_file = self.__get_tag_file(path)
         if not tag_file:
@@ -246,11 +301,10 @@ class FileTagger(Tagger):
             except:
                 return False
 
-    def __get_tag_file(self, path):
-        _path = os.path.abspath(path)
-        if os.path.isfile(path):
-            _path = os.path.dirname(_path)
-        tag_file = os.path.join(_path, self.TAG_FILE)
+    def __get_tag_file(self, abspath):
+        if os.path.isfile(abspath):
+            abspath = os.path.dirname(abspath)
+        tag_file = os.path.join(abspath, self.TAG_FILE)
         return tag_file
 
 

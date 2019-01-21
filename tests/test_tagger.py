@@ -90,6 +90,15 @@ class TaggerTestCase(unittest.TestCase):
         self.assertEqual(2, len(paths))
         self.assertEqual(set(map(lambda s: os.path.abspath(s), ['tmp0/tmpf', "tmp0/tmp1"])), set(paths))
 
+    def test_find_tags_depth(self):
+        self.tagger.add_tags("tmp0", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1", "test1")
+        self.tagger.add_tags("tmp0/tmp1/tmp3", "test1")
+        self.tagger.add_tags("tmp0/tmpf", "test1")
+
+        self.assertEqual(set(map(lambda s: os.path.abspath(s), ['tmp0/tmpf', "tmp0/tmp1"])), set(self.tagger.find_tags("tmp0", "test1", depth=1)))
+        self.assertEqual(set(map(lambda s: os.path.abspath(s), ['tmp0/tmpf', "tmp0/tmp1", "tmp0/tmp1/tmp3"])), set(self.tagger.find_tags("tmp0", "test1", depth=2)))
+
     def test_get_tags_dir(self):
         self.tagger.add_tags("tmp0", "test1", "test2", "test3")
         tags = self.tagger.get_tags("tmp0")

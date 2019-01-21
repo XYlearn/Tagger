@@ -21,7 +21,7 @@ def tagger_rm(args):
 
 def tagger_find(args):
     tg = FileTagger()
-    found = tg.find_tags(args.path, *args.tags)
+    found = tg.find_tags(args.path, *args.tags, top_only=args.top, depth=args.depth)
     print('\n'.join(found))
 
 
@@ -64,6 +64,8 @@ def get_parser():
     parser_find = subparsers.add_parser("find", help="find paths that have tags")
     parser_find.add_argument("path", help="path to find tags")
     parser_find.add_argument("tags", nargs="+", help="tags to find")
+    parser_find.add_argument("-t", "--top", help="only find top directories that have tags", action="store_true", default=False)
+    parser_find.add_argument("-d", "--depth", type=int, help="depth of folder to search")
     parser_find.set_defaults(func=tagger_find)
     # tagger clear
     parser_clear = subparsers.add_parser("clear", help="clear path's tags")
@@ -81,12 +83,15 @@ def get_parser():
 
 
 def main():
-    parser = get_parser()
-    args = parser.parse_args()
-    if 'func' in args:
-        args.func(args)
-    else:
-        parser.parse_args(['-h'])
+    try:
+        parser = get_parser()
+        args = parser.parse_args()
+        if 'func' in args:
+            args.func(args)
+        else:
+            parser.parse_args(['-h'])
+    except KeyboardInterrupt:
+        print("[-] Cancelled by user")
 
 
 if __name__ == "__main__":
