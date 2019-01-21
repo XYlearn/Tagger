@@ -6,3 +6,4 @@ A tagger to add tag features to file or directory.
 - Remove tags from file
 - Get tags of file
 - Find tags recursively
+- merge directories and files that have specific tags

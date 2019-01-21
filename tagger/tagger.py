@@ -6,6 +6,10 @@ import re
 import logging
 import json
 import time
+import shutil
+from collections import deque
+
+logger = logging.getLogger(__name__)
 
 
 class Tagger(abc.ABC):
@@ -13,7 +17,7 @@ class Tagger(abc.ABC):
         '''add tags to path
         Args:
             path(str): path of tags
-            *tags(list(str)): tags to add
+            *tags(str): tags to add
         Return(boolean): whether tags are added successfully. if path doesn't exist reuturn false
         '''
         if not tags or not os.path.exists(path):
@@ -27,7 +31,7 @@ class Tagger(abc.ABC):
         '''remove tags from path
         Args:
             path(str): path to delete tags from
-            *tags(list(str)): tags to delete
+            *tags(str): tags to delete
         Return(boolean): whether tags are removed successfully. if path doesn't exist reuturn false
         '''
         if not os.path.exists(path):
@@ -41,7 +45,9 @@ class Tagger(abc.ABC):
         '''find tags in path
         Args:
             path(str): dir path to recursively search for tags; or file path to search only for that file.
-            *tags(list(str)): tags to search
+            *tags(str): tags to search
+            **kwargs:
+                top_only(boolean): only top directories or files will be returned
         Return(list(str)): abs paths that hold tags. if path doesn't exist reuturn empty list
         '''
         if not os.path.exists(path):
@@ -52,14 +58,10 @@ class Tagger(abc.ABC):
                 return [os.path.abspath(path)]
             else:
                 return []
-        paths = []
-        for root, _, files in os.walk(path):
-            target_paths = [os.path.join(root, f) for f in files]
-            target_paths.append(root)
-            for target in target_paths:
-                if set(tags).issubset(set(self.get_tags(target))):
-                    paths.append(os.path.abspath(target))
-        return paths
+        if kwargs.get("top_only"):
+            return self.__find_tags_top_only(path, *tags)
+        else:
+            return self.__find_tags_all(path, *tags)
 
     def get_tags(self, path, **kwargs):
         '''get tags in path
@@ -92,6 +94,47 @@ class Tagger(abc.ABC):
         '''
         pass
 
+    def merge_tags(self, path, dest_path, *tags, **kwargs):
+        '''copy all top directories or files that have tags to dest_path.
+        and add tags to dest_path. duplicated path name will be renamed to
+        $name_1, $name_2, etc.
+        Args:
+            path(str): path to search for tags
+            dest_path(str): path to store found files
+            *tags(str): tags to search for
+        Return(boolean): return True if succeed.
+        '''
+        # merge single file is meaningless
+        if not os.path.isdir(path):
+            return False
+        # check dest_path
+        if os.path.exists(dest_path):
+            if not os.path.isdir(dest_path):
+                return False
+        else:
+            try:
+                os.mkdir(dest_path)
+            except:
+                return False
+        paths = self.find_tags(path, *tags, top_only=True)
+        for path in paths:
+            target = os.path.join(dest_path, os.path.basename(path))
+            if os.path.exists(target):
+                postfix = 1
+                while os.path.exists("{}_{}".format(target, postfix)):
+                    postfix += 1
+                target = "{}_{}".format(target, postfix)
+                logger.warn(
+                    "[!] {} name duplicate, rename to {}".format(path, target))
+            try:
+                if os.path.isdir(path):
+                    shutil.copytree(path, target)
+                else:
+                    shutil.copy2(path, target)
+            except:
+                logger.warn("[!] Fail to copy {} to {}".format(path, target))
+        self.add_tags(dest_path, *tags)
+
     @abc.abstractmethod
     def _read_tags(self, path):
         '''read tags of path. path must exist'''
@@ -99,8 +142,41 @@ class Tagger(abc.ABC):
 
     @abc.abstractmethod
     def _write_tags(self, path, tags):
-        '''write tags of path. path must exist'''
+        '''write tags of path. path must exist.'''
         pass
+
+    def __find_tags_top_only(self, path, *tags):
+        '''path must exist'''
+        # use BFS
+        roots = deque([path])
+        paths = []
+        while len(roots):
+            _path = roots.pop()
+            root, dirs, files = next(os.walk(_path))
+            if self.__contain_tags(root, *tags):
+                paths.append(os.path.abspath(root))
+            for f in map(lambda f: os.path.join(root, f), files):
+                if self.__contain_tags(f, *tags):
+                    paths.append(os.path.abspath(f))
+            for d in map(lambda d: os.path.join(root, d), dirs):
+                if self.__contain_tags(d, *tags):
+                    paths.append(os.path.abspath(d))
+                else:
+                    roots.append(d)
+        return paths
+
+    def __find_tags_all(self, path, *tags):
+        paths = []
+        for root, _, files in os.walk(path):
+            target_paths = [os.path.join(root, f) for f in files]
+            target_paths.append(root)
+            for target in target_paths:
+                if self.__contain_tags(target, *tags):
+                    paths.append(os.path.abspath(target))
+        return paths
+
+    def __contain_tags(self, path, *tags):
+        return set(tags).issubset(set(self.get_tags(path)))
 
 
 class FileTagger(Tagger):
