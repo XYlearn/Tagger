@@ -117,22 +117,17 @@ class Tagger(abc.ABC):
             except:
                 return False
         paths = self.find_tags(path, *tags, top_only=True)
-        for path in paths:
-            target = os.path.join(dest_path, os.path.basename(path))
-            if os.path.exists(target):
-                postfix = 1
-                while os.path.exists("{}_{}".format(target, postfix)):
-                    postfix += 1
-                target = "{}_{}".format(target, postfix)
-                logger.warn(
-                    "[!] {} name duplicate, rename to {}".format(path, target))
+        for p in paths:
+            target = os.path.join(dest_path, os.path.basename(p))
+            target = self.__handle_dup_path(p, target)
             try:
-                if os.path.isdir(path):
-                    shutil.copytree(path, target)
+                if os.path.isdir(p):
+                    shutil.copytree(p, target)
                 else:
-                    shutil.copy2(path, target)
+                    shutil.copy2(p, target)
+                    self.add_tags(target, *self.get_tags(p))
             except:
-                logger.warn("[!] Fail to copy {} to {}".format(path, target))
+                logger.warn("[!] Fail to copy {} to {}".format(p, target))
         self.add_tags(dest_path, *tags)
 
     @abc.abstractmethod
@@ -177,6 +172,15 @@ class Tagger(abc.ABC):
 
     def __contain_tags(self, path, *tags):
         return set(tags).issubset(set(self.get_tags(path)))
+
+    def __handle_dup_path(self, path, target):
+        if os.path.exists(target):
+            postfix = 1
+            while os.path.exists("{}_{}".format(target, postfix)):
+                postfix += 1
+            target = "{}_{}".format(target, postfix)
+            logger.info("[*] {} duplicate, rename to {}".format(path, target))
+        return target
 
 
 class FileTagger(Tagger):
