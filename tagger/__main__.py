@@ -38,35 +38,47 @@ def tagger_clear(args):
         print("[-] Fail to clear tags")
 
 
+def tagger_merge(args):
+    tg = FileTagger()
+    tg.merge_tags(args.path, args.dest_path, *args.tags)
+
+
 def get_parser():
     parser = argparse.ArgumentParser(prog="tagger")
     subparsers = parser.add_subparsers()
     # tagger add
-    parser_add = subparsers.add_parser(
-        "add", help="tagger add [path] [tags..]")
+    parser_add = subparsers.add_parser("add", help="add tags to path")
     parser_add.add_argument("path", help="path to add tags")
-    parser_add.add_argument("tags", nargs="*", help="tags to add")
+    parser_add.add_argument("tags", nargs="+", help="tags to add")
     parser_add.set_defaults(func=tagger_add)
     # tagger rm
-    parser_rm = subparsers.add_parser("rm", help="tagger rm [path] [tags..]")
+    parser_rm = subparsers.add_parser("rm", help="remove tags from path")
     parser_rm.add_argument("path", help="path to remove tags from")
-    parser_rm.add_argument("tags", nargs="*", help="tags to remove")
+    parser_rm.add_argument("tags", nargs="+", help="tags to remove")
     parser_rm.set_defaults(func=tagger_rm)
     # tagger get
-    parser_get = subparsers.add_parser("get", help="tagger get [path]")
+    parser_get = subparsers.add_parser("get", help="get tags of path")
     parser_get.add_argument("path", help="path of tags")
     parser_get.set_defaults(func=tagger_get)
     # tagger find
-    parser_find = subparsers.add_parser("find", help="find tags path")
+    parser_find = subparsers.add_parser("find", help="find paths that have tags")
     parser_find.add_argument("path", help="path to find tags")
-    parser_find.add_argument("tags", nargs="*", help="tags to find")
+    parser_find.add_argument("tags", nargs="+", help="tags to find")
     parser_find.set_defaults(func=tagger_find)
     # tagger clear
-    parser_clear = subparsers.add_parser("clear", help="tagger clear [path]")
+    parser_clear = subparsers.add_parser("clear", help="clear path's tags")
     parser_clear.add_argument("path", help="path to clear tags")
     parser_clear.set_defaults(func=tagger_clear)
+    # tagger merge
+    parser_merge = subparsers.add_parser("merge", help="merge file with same tags to dest directory")
+    parser_merge.add_argument("path", help="path to search for tags")
+    parser_merge.add_argument(
+        "dest_path", help="dest directory to save copy of files")
+    parser_merge.add_argument("tags", nargs="+", help="tags to merge")
+    parser_merge.set_defaults(func=tagger_merge)
 
     return parser
+
 
 def main():
     parser = get_parser()
@@ -78,4 +90,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()    
+    main()

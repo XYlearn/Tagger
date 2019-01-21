@@ -8,7 +8,7 @@ with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name="tagger",
-    version="0.0.1",
+    version="0.0.2",
     description="Tagger to manage tags of file or directory",
     long_description=long_description,
     long_description_content_type='text/markdown',
