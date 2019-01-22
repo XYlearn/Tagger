@@ -152,8 +152,8 @@ class Tagger(abc.ABC):
         curr_depth = 0
         roots = deque([root])
         tmp_roots = deque()
-        sub_roots = deque()
         while len(roots):
+            sub_roots = deque()
             while len(roots):
                 top = roots.pop()
                 if self._possible_has_tag_entry(top):
@@ -188,8 +188,8 @@ class Tagger(abc.ABC):
         '''path must exist'''
         paths = []
         path_gen = self._possible_tagged_paths(path, depth=kwargs.get('depth'))
-        ret = path_gen.send(None)
         try:
+            ret = path_gen.send(None)
             while True:
                 p, is_dir = ret
                 if self._contain_tags(p, *tags):
@@ -205,8 +205,8 @@ class Tagger(abc.ABC):
     def _find_tags_all(self, path, *tags, **kwargs):
         paths = []
         path_gen = self._possible_tagged_paths(path, depth=kwargs.get('depth'))
-        ret = path_gen.send(None)
         try:
+            ret = path_gen.send(None)
             while True:
                 p, _ = ret
                 if self._contain_tags(p, *tags):
