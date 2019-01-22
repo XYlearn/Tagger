@@ -33,7 +33,7 @@ def tagger_get(args):
 
 def tagger_clear(args):
     tg = FileTagger()
-    res = tg.clear_tags(args.path)
+    res = tg.clear_tags(args.path, recursive=args.recursive, depth=args.depth, top_only=args.top)
     if not res:
         print("[-] Fail to clear tags")
 
@@ -42,6 +42,10 @@ def tagger_merge(args):
     tg = FileTagger()
     tg.merge_tags(args.path, args.dest_path, *args.tags)
 
+
+def tagger_sync(args):
+    tg = FileTagger()
+    tg.sync_tags(args.path)
 
 def get_parser():
     parser = argparse.ArgumentParser(prog="tagger")
@@ -70,6 +74,9 @@ def get_parser():
     # tagger clear
     parser_clear = subparsers.add_parser("clear", help="clear path's tags")
     parser_clear.add_argument("path", help="path to clear tags")
+    parser_clear.add_argument("-r", "--recursive", help="recursively clear tags", action="store_true", default=False)
+    parser_clear.add_argument("-t", "--top", help="top only mode, valid if -r is given", action='store_true', default=False)
+    parser_clear.add_argument("-d", "--depth", type=int, help="recursive depth, valid if -r is given")
     parser_clear.set_defaults(func=tagger_clear)
     # tagger merge
     parser_merge = subparsers.add_parser("merge", help="merge file with same tags to dest directory")

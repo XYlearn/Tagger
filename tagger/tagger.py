@@ -79,11 +79,34 @@ class Tagger(abc.ABC):
         '''clear tags in path
         Args:
             path(str): path to clear tags from
-        Return(boolean): True if succeed. if path doesn't exist reuturn false
+            **kwargs:
+                recursive(boolean): whether to clear tags recursively
+                depth(int): depth to recursively remove tags. valid only if recursive is True
+                top_only: only clear tags of top folder or files. valid only if recursive is True
+        Return(boolean): If path doesn't exist reuturn false
         '''
         if not os.path.exists(path):
             return False
-        return self._write_tags(path, [])
+        if not os.path.isdir(path):
+            return self._write_tags(path, [])
+        if not kwargs.get('recursive'):
+            return self._write_tags(path, [])
+        depth = kwargs.get('depth')
+        path_gen = self._possible_tagged_paths(path, depth=depth)
+        top_only = kwargs.get('top_only')
+        try:
+            ret = path_gen.send(None)
+            while True:
+                p, is_dir = ret
+                self._write_tags(p, [])
+                if is_dir:
+                    # stop if in top only mode
+                    ret = path_gen.send(top_only)
+                    continue
+                ret = path_gen.send(False)
+        except StopIteration:
+            pass
+        return True
 
     @abc.abstractmethod
     def sync_tags(self, path, **kwargs):

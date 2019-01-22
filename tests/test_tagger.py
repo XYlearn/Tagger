@@ -126,6 +126,35 @@ class TaggerTestCase(unittest.TestCase):
         self.tagger.clear_tags("tmp0/tmpf")
         self.assertTrue(len(self.tagger.get_tags("tmp0")) == 0)
 
+    def test_clear_tags_dir_recursive(self):
+        self.tagger.add_tags("tmp0", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1/tmp3", "test1", "test2", "test3")
+        self.tagger.clear_tags("tmp0", recursive=True)
+        self.assertTrue(len(self.tagger.get_tags("tmp0")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1/tmp3")) == 0)
+
+    def test_clear_tags_dir_recursive_top_only(self):
+        self.tagger.add_tags("tmp0", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1/tmp3", "test1", "test2", "test3")
+        self.tagger.clear_tags("tmp0", recursive=True, top_only=True)
+        self.assertTrue(len(self.tagger.get_tags("tmp0")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1")) == 3)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1/tmp3")) == 3)
+
+    def test_clear_tags_dir_recursive_depth(self):
+        self.tagger.add_tags("tmp0", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmp1/tmp3", "test1", "test2", "test3")
+        self.tagger.add_tags("tmp0/tmpf", "test1", "test2", "test3")
+        self.tagger.clear_tags("tmp0", recursive=True, depth=1)
+        self.assertTrue(len(self.tagger.get_tags("tmp0")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmpf")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1")) == 0)
+        self.assertTrue(len(self.tagger.get_tags("tmp0/tmp1/tmp3")) == 3)
+
     def test_sync_tags(self):
         self.tagger.add_tags("tmp0/tmpf", "test0")
         os.remove("tmp0/tmpf")
