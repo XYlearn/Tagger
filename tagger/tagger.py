@@ -113,6 +113,10 @@ class Tagger(abc.ABC):
         '''synchronize tags with file in path. non-existent entry will me removed
         Args:
             path(str): path to synchronze
+            **kwargs:
+                recursive(boolean): whether to sync tags recursively
+                depth(int): depth to recursively sync tags. valid only if recursive is True
+                top_only: only sync tags of top folder or files. valid only if recursive is True
         Return(boolean): True if succeed. if path doesn't exist reuturn false
         '''
         pass
@@ -261,17 +265,26 @@ class Tagger(abc.ABC):
 class FileTagger(Tagger):
     TAG_FILE = '.tag'
 
-    def sync_tags(self, path):
+    def sync_tags(self, path, **kwargs):
         if not os.path.exists(path):
             return False
-        meta = self.__read_tag_meta(path)
-        dangler_paths = []
-        for _path in meta:
-            if not os.path.exists(_path):
-                dangler_paths.append(_path)
-        for _path in dangler_paths:
-            meta.pop(_path)
-        self.__write_tag_meta(path, meta)
+        recursive = kwargs.get('recursive')
+        if recursive:
+            top_only = kwargs.get('top_only')
+            depth = kwargs.get('depth')
+            if not depth:
+                depth = -1
+            for entry in os.scandir(path):
+                if entry.is_dir():
+                    if top_only:
+                        self.sync_tags(entry.path, recursive=False)
+                    else:
+                        self.sync_tags(
+                            entry.path, recursive=True, depth=depth-1)
+                else:
+                    self.__sync_tags_one(path)
+        else:
+            self.__sync_tags_one(path)
 
     def _read_tags(self, path):
         _path = os.path.abspath(path)
@@ -329,6 +342,16 @@ class FileTagger(Tagger):
             abspath = os.path.dirname(abspath)
         tag_file = os.path.join(abspath, self.TAG_FILE)
         return tag_file
+
+    def __sync_tags_one(self, path):
+        meta = self.__read_tag_meta(path)
+        dangler_paths = []
+        for _path in meta:
+            if not os.path.exists(_path):
+                dangler_paths.append(_path)
+        for _path in dangler_paths:
+            meta.pop(_path)
+        self.__write_tag_meta(path, meta)
 
 
 class DBTagger(Tagger):

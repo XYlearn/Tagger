@@ -45,7 +45,7 @@ def tagger_merge(args):
 
 def tagger_sync(args):
     tg = FileTagger()
-    tg.sync_tags(args.path)
+    tg.sync_tags(args.path, recursive=args.recursive, depth=args.depth, top_only=args.top)
 
 def get_parser():
     parser = argparse.ArgumentParser(prog="tagger")
@@ -68,14 +68,14 @@ def get_parser():
     parser_find = subparsers.add_parser("find", help="find paths that have tags")
     parser_find.add_argument("path", help="path to find tags")
     parser_find.add_argument("tags", nargs="+", help="tags to find")
-    parser_find.add_argument("-t", "--top", help="only find top directories that have tags", action="store_true", default=False)
+    parser_find.add_argument("-t", "--top", help="only find top directories that have tags", action="store_true")
     parser_find.add_argument("-d", "--depth", type=int, help="depth of folder to search")
     parser_find.set_defaults(func=tagger_find)
     # tagger clear
     parser_clear = subparsers.add_parser("clear", help="clear path's tags")
     parser_clear.add_argument("path", help="path to clear tags")
-    parser_clear.add_argument("-r", "--recursive", help="recursively clear tags", action="store_true", default=False)
-    parser_clear.add_argument("-t", "--top", help="top only mode, valid if -r is given", action='store_true', default=False)
+    parser_clear.add_argument("-r", "--recursive", help="recursively clear tags", action="store_true")
+    parser_clear.add_argument("-t", "--top", help="top only mode, valid if -r is given", action='store_true')
     parser_clear.add_argument("-d", "--depth", type=int, help="recursive depth, valid if -r is given")
     parser_clear.set_defaults(func=tagger_clear)
     # tagger merge
@@ -85,7 +85,13 @@ def get_parser():
         "dest_path", help="dest directory to save copy of files")
     parser_merge.add_argument("tags", nargs="+", help="tags to merge")
     parser_merge.set_defaults(func=tagger_merge)
-
+    # tagger sync
+    parser_sync = subparsers.add_parser("sync", help="synchronize tags, remove tags of non-existent files")
+    parser_sync.add_argument("path", help="path to synchronize tags")
+    parser_sync.add_argument("-r", '--recursive', help='recursively sync tags', action='store_true')
+    parser_sync.add_argument('-t', '--top', help='sync only top files or folders', action='store_true')
+    parser_sync.add_argument('-d', '--depth', type=int, help='depth to sync')
+    parser_sync.set_defaults(func=tagger_sync)
     return parser
 
 
